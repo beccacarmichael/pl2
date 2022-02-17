@@ -1,0 +1,169 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Valentine Map</title>
+  <style>
+  html, body, #viewDiv {
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  }
+  </style>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.22/"></script>
+
+  <script>
+
+  require([
+    "esri/config",
+    "esri/Map",
+    "esri/views/MapView",
+    "esri/rest/locator",
+    "esri/Graphic",
+    "esri/layers/GraphicsLayer"
+    ], function(esriConfig,Map, MapView, locator, Graphic, GraphicsLayer ) {
+
+
+    esriConfig.apiKey = "AAPKf66a081660b44a45b6016e5f8ae7c71e8icQMOejFvdELm_yOtk4GdPi1iAfrKqqtG29-FrXeOInl29Haaym5aGp-DAB4yzL";
+
+    const map = new Map({
+      basemap: "topo-vector"
+    });
+    const graphicsLayer = new GraphicsLayer();
+    map.add(graphicsLayer);
+
+    const view = new MapView({
+      container: "viewDiv",
+      map: map,
+      center: [-114.08219168997454, 51.100761633290915], //Longitude, latitude 51.100761633290915, -114.08219168997454
+      zoom: 14,
+    });
+
+    // Create a polygon in the shape of a heart to mark the hometown neighborhood of my valentine 
+    const polygon = {
+        type: "polygon",
+        rings: [
+            [-114.08555592352342, 51.10225063830154], //Longitude, latitude 51.10225063830154, -114.08555592352342
+            [-114.0840538864211, 51.10378664526642], //Longitude, latitude 51.10378664526642, -114.0840538864211
+            [-114.08238018793564, 51.10313991171238], //Longitude, latitude 51.10313991171238, -114.08238018793564
+            [-114.08242310328143, 51.10233148204579], //Longitude, latitude 51.10233148204579, -114.08242310328143
+            [-114.08323849485126, 51.101011016519145], //Longitude, latitude 51.101011016519145, -114.08323849485126
+            [-114.0846976166078, 51.09974441210512], //Longitude, latitude 51.09974441210512, -114.0846976166078
+            [-114.08568466956076, 51.09896287292116], //Longitude, latitude 51.09896287292116, -114.08568466956076
+            [-114.08787335219557, 51.1003103460255], //Longitude, latitude 51.1003103460255, -114.08787335219557
+            [-114.08868874376543, 51.10173862463815], //Longitude, latitude 51.10173862463815, -114.08868874376543
+            [-114.08886040514854, 51.10330159594916], //Longitude, latitude 51.10330159594916, -114.08886040514854
+            [-114.08705796062576, 51.10381359230146], //Longitude, latitude 51.10381359230146, -114.08705796062576
+            [-114.08555592352342, 51.10225063830154], //Longitude, latitude 51.10225063830154, -114.08555592352342
+            
+        ]
+     };
+    
+     const simpleFillSymbol = {
+        type: "simple-fill",
+        color: [255, 20, 147, 0.5],  // make the heart pink, opacity 50%
+        outline: {
+            color: [255, 20, 147],
+            width: 2
+        }
+     };
+    // add a description pop-up box for the heart polygon
+     const popupTemplate = {
+        title: "{Name}",
+        content: "{Description}"
+     }
+     const attributes = {
+        Name: "Hometown Valentine Visit",
+        Description: "The start point of the Hometown Valentine Visit, my Valentine's hometown neighborhood. By selecting a place type you can see different attractions in the neighborhood for a fun Valentines day."
+     }
+    
+     const polygonGraphic = new Graphic({
+        geometry: polygon,
+        symbol: simpleFillSymbol,
+    
+        attributes: attributes,
+        popupTemplate: popupTemplate
+    
+     });
+     graphicsLayer.add(polygonGraphic);
+
+    // Add 'points of interest' for the valentine date in the neighborhood - removed hotel and gas station because that is not relevant 
+    const places = ["Choose a place type...", "Parks and Outdoors", "Coffee shop", "Food",];
+
+    const select = document.createElement("select","");
+      select.setAttribute("class", "esri-widget esri-select");
+      select.setAttribute("style", "width: 175px; font-family: 'Avenir Next W00'; font-size: 1em");
+
+    places.forEach(function(p){
+      const option = document.createElement("option");
+      option.value = p;
+      option.innerHTML = p;
+      select.appendChild(option);
+    });
+
+    view.ui.add(select, "top-right");
+
+    const locatorUrl = "http://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer";
+
+   // Have Esri find places and add them to the map - change max locations to 30
+   function findPlaces(category, pt) {
+    locator.addressToLocations(locatorUrl, {
+      location: pt,
+      categories: [category],
+      maxLocations: 30,
+      outFields: ["Place_addr", "PlaceName"]
+    })
+
+    .then(function(results) {
+      view.popup.close();
+      view.graphics.removeAll();
+
+      results.forEach(function(result){
+        view.graphics.add(
+          new Graphic({
+            attributes: result.attributes,  // Data attributes returned
+            geometry: result.location, // Point returned
+            symbol: {
+             type: "simple-marker",
+             style: "diamond", //change the marker shape to diamond to fit the them 
+             color: "red",
+             size: "13px",
+             outline: {
+               color: "red", //change the color to red so it fits the them of Valentines 
+               width: "2px"
+             }
+            },
+
+            popupTemplate: {
+              title: "{PlaceName}", // Data attribute names
+              content: "{Place_addr}"
+            }
+         }));
+      });
+
+    });
+
+  }
+
+  // Search for places in center of map
+  view.watch("stationary", function(val) {
+    if (val) {
+       findPlaces(select.value, view.center);
+    }
+    });
+
+  // Listen for category changes and find places
+  select.addEventListener('change', function (event) {
+    findPlaces(event.target.value, view.center);
+  });
+
+});
+  </script>
+
+  </head>
+  <body>
+    <div id="viewDiv"></div>
+  </body>
+</html>
